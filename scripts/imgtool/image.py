@@ -91,7 +91,7 @@ class Image():
     def __init__(self, version=None, header_size=IMAGE_HEADER_SIZE,
                  pad_header=False, pad=False, align=1, slot_size=0,
                  max_sectors=DEFAULT_MAX_SECTORS, overwrite_only=False,
-                 endian="little"):
+                 endian="little", customHeader=True):
         self.version = version or versmod.decode_version("0")
         self.header_size = header_size
         self.pad_header = pad_header
@@ -102,6 +102,7 @@ class Image():
         self.overwrite_only = overwrite_only
         self.endian = endian
         self.base_addr = None
+        self.customHeader = customHeader
         self.payload = []
 
     def __repr__(self):
@@ -182,7 +183,10 @@ class Image():
             dependencies_num = len(dependencies[DEP_IMAGES_KEY])
             protected_tlv_size = (dependencies_num * 16) + TLV_INFO_SIZE
 
-        self.add_header(enckey, protected_tlv_size)
+        if (self.customHeader == False):
+            self.add_header(enckey, protected_tlv_size)
+        else:
+            self.add_header_custom()
 
         tlv = TLV(self.endian)
 
@@ -249,8 +253,32 @@ class Image():
             img = bytes(self.payload[self.header_size:])
             self.payload[self.header_size:] = encryptor.update(img) + \
                                               encryptor.finalize()
+        if (self.customHeader == False):
+            self.payload += tlv.get()[protected_tlv_size:]
 
-        self.payload += tlv.get()[protected_tlv_size:]
+    def add_header_custom(self):
+
+        sha = hashlib.sha256()
+        sha.update(bytes(self.payload[self.header_size:]))
+        #digest = sha.hexdigest().encode()
+        digest = sha.digest()
+        
+        fmt = (
+               'I'    +  # ImgSize  uint32
+               'II'   +  # Padding
+               'BBH'     # Vers     ImageVersion
+               )
+
+        #assert struct.calcsize(fmt) == IMAGE_HEADER_SIZE
+        header = struct.pack(fmt,
+                len(self.payload) - self.header_size, # ImageSize
+                0,0,
+                self.version.major, self.version.minor or 0, self.version.revision or 0,
+                )
+        self.payload = bytearray(self.payload)
+        self.payload[:16] = header
+        self.payload[16:32] = digest[:16]
+        
 
     def add_header(self, enckey, protected_tlv_size):
         """Install the image header."""

@@ -170,16 +170,19 @@ class BasedIntParamType(click.ParamType):
 @click.option('--align', type=click.Choice(['1', '2', '4', '8']),
               required=True)
 @click.option('-k', '--key', metavar='filename')
+
+@click.option('--customheader', default=False, is_flag=True)
+
 @click.command(help='''Create a signed or unsigned image\n
                INFILE and OUTFILE are parsed as Intel HEX if the params have
                .hex extension, othewise binary format is used''')
 def sign(key, align, version, header_size, pad_header, slot_size, pad,
          max_sectors, overwrite_only, endian, encrypt, infile, outfile,
-         dependencies):
+         dependencies, customheader):
     img = image.Image(version=decode_version(version), header_size=header_size,
                       pad_header=pad_header, pad=pad, align=int(align),
                       slot_size=slot_size, max_sectors=max_sectors,
-                      overwrite_only=overwrite_only, endian=endian)
+                      overwrite_only=overwrite_only, endian=endian, customHeader=customheader)
     img.load(infile)
     key = load_key(key) if key else None
     enckey = load_key(encrypt) if encrypt else None
